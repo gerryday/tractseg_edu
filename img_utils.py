@@ -2,21 +2,13 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 
 import plotly
-import plotly.plotly as py
+import chart_studio.plotly as py
 import plotly.graph_objs as go
 import numpy as np
 import nibabel as nib
 from skimage import measure
 from nibabel import trackvis
-from dipy.tracking.utils import move_streamlines
-
-def enable_plotly_in_cell():
-    # https://stackoverflow.com/a/54771665
-    import IPython
-    from plotly.offline import init_notebook_mode
-    display(IPython.core.display.HTML('''<script src="/static/components/requirejs/require.js"></script>'''))
-    init_notebook_mode(connected=False)
-
+from dipy.tracking.streamline import transform_streamlines
 
 def get_voxelwise_orientation_colormap(streamlines, orientation="axial"):
     color = []
@@ -59,7 +51,6 @@ def get_3D_volume(path, opacity=1, color="red"):
     trace = go.Mesh3d(x=x,y=y,z=z,i=i,j=j,k=k,opacity=opacity, color=color, flatshading=None, 
                       lighting=lighting_effects, lightposition=dict(x=25,y=100,z=50))
     #alphahull=1, intensity=values
-    #plotly.offline.iplot([trace])
     return trace
 
 
@@ -68,7 +59,7 @@ def get_streamlines_plot(path, ref_img_path, subsampling=10):
 
     streams, hdr = trackvis.read(path)
     streamlines = [s[0] for s in streams]
-    streamlines = list(move_streamlines(streamlines, np.linalg.inv(affine)))
+    streamlines = list(transform_streamlines(streamlines, np.linalg.inv(affine)))
 
     traces = []
     for sl in streamlines[::subsampling]:
@@ -87,28 +78,29 @@ def get_streamlines_plot(path, ref_img_path, subsampling=10):
 
 
 def plot_3D_volume(path,):
-    enable_plotly_in_cell()
     bundle = get_3D_volume(path, color="salmon")
-    plotly.offline.iplot([bundle])
+    layout=go.Layout(showlegend=False)
+    fig = go.Figure(data=[bundle],layout=layout)
+    fig.show()
 
 
 def plot_3D_volume_with_brain_mask(path, brain_mask_path):
-    enable_plotly_in_cell()
     brain_mask = get_3D_volume(brain_mask_path, opacity=0.1, color="silver")
     bundle = get_3D_volume(path, color="salmon")
-    plotly.offline.iplot([brain_mask, bundle])
+    layout=go.Layout(showlegend=False)
+    fig = go.Figure(data=[brain_mask, bundle],layout=layout)
+    fig.show()
   
 
 def plot_streamlines_with_brain_mask_and_endings_mask(sl_path, brain_mask_path, endings_path,
                                                       subsampling=10):
-    enable_plotly_in_cell()
     brain_mask = get_3D_volume(brain_mask_path, opacity=0.1, color="silver")
     endings_mask = get_3D_volume(endings_path, opacity=0.2, color="salmon")
     t = get_streamlines_plot(sl_path,brain_mask_path, subsampling=subsampling)
     
     layout=go.Layout(showlegend=False)
     figure=go.Figure(data=[brain_mask, endings_mask] + t, layout=layout)
-    plotly.offline.iplot(figure)
+    figure.show()
 
 
 def merge_masks(path_in_1, path_in_2, path_out):
@@ -122,5 +114,6 @@ def merge_masks(path_in_1, path_in_2, path_out):
 
     combined_img = nib.Nifti1Image(new_mask.astype("uint8"), ref_img.affine) 
     nib.save(combined_img, path_out)
+
 
 
